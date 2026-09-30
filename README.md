@@ -58,6 +58,12 @@ HealthCompanion/
 RESOURCES.md                    inventory of the pre-provisioned workshop resources
 ```
 
+## Status
+
+Deployed and verified end-to-end in `us-west-2` on 2026-09-30: AgentCore Runtime + Memory + Gateway (7 Lambda
+tools) + baseline Guardrail, exercised through both the CLI helper and the Streamlit web UI. See
+[DEMO.md](DEMO.md) for the scripted walkthrough and [RESOURCES.md](RESOURCES.md) for resource ids.
+
 ## Running
 
 ```bash

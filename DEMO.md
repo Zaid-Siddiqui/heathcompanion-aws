@@ -1,5 +1,12 @@
 # Demo script — Health Companion (5 minutes)
 
+**Live:** deployed runtime `HealthCompanion_HealthCompanionAgent-ABwSEU88dH` (us-west-2). Every step below was
+run against the deployed agent on 2026-09-30 and behaved as described.
+
+**Web UI:** `cd HealthCompanion/web-ui && .venv/Scripts/python -m streamlit run app.py --server.port 8501`
+→ http://localhost:8501 (Cognito sign-in, language toggle, patient selector).
+**CLI:** `python scripts/invoke_runtime.py "<prompt>" --patient PAT-01 --actor aisha --session <stable-id>`
+
 **Pitch line:** Aisha, 58, hypertensive, Arabic-speaking. One conversation saves an unnecessary ER visit and gets
 her to the right specialist with a booked slot and a doctor-ready summary — without ever diagnosing or dosing.
 
@@ -40,10 +47,13 @@ surfaced, GP suggested.
 
 Expect: reading logged, **urgent**, "contact your doctor today", hypertension context, trend on repeat readings.
 
-## 7. Memory (~20 s, new session)
+## 7. Memory (~20 s, new session, same signed-in user)
 > my headache is back
 
-Expect: recalls the earlier headache/vision episode and preferred language from AgentCore Memory.
+Expect: recalls the earlier headache/vision episode, hypertension, amlodipine and the booked appointment from
+AgentCore Memory (semantic namespace `/users/<actor>/facts`; verified — 9 facts extracted after the first session).
+Show the records if asked:
+`aws bedrock-agentcore list-memory-records --memory-id HealthCompanion_HealthMemory-bMJEFtF7od --namespace /users/aisha/facts`
 
 ## Talking points
 - Strands agent on AgentCore Runtime; 7 tools as one Lambda behind AgentCore Gateway (MCP, IAM auth, SigV4);
