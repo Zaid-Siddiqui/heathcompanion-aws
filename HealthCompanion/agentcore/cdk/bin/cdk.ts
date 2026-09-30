@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { AgentCoreStack, type HarnessConfig } from '../lib/cdk-stack';
 import { ConfigIO, HarnessSpecSchema, type AwsDeploymentTarget } from '@aws/agentcore-cdk';
-import { App, type Environment } from 'aws-cdk-lib';
+import { App, CliCredentialsStackSynthesizer, type Environment } from 'aws-cdk-lib';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -189,6 +189,14 @@ async function main() {
         )
       : undefined;
 
+    // Workshop accounts cannot create the cdk-* bootstrap roles (participant policy
+    // only allows workshop-*/AgentCore* role names), so deploy with the caller's own
+    // credentials and a workshop-* asset bucket instead of a CDK toolkit stack.
+    const synthesizer = new CliCredentialsStackSynthesizer({
+      fileAssetsBucketName: `workshop-cdk-assets-${target.account}-${target.region}`,
+      qualifier: 'agentcore',
+    });
+
     new AgentCoreStack(app, stackName, {
       spec,
       mcpSpec,
@@ -197,6 +205,7 @@ async function main() {
       harnesses: harnessConfigs.length > 0 ? harnessConfigs : undefined,
       paymentSpec,
       env,
+      synthesizer,
       description: `AgentCore stack for ${spec.name} deployed to ${target.name} (${target.region})`,
       tags: {
         'agentcore:project-name': spec.name,

@@ -1,0 +1,6 @@
+{
+    "region":  "us-west-2",
+    "discovery_url":  "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_hUvupv3K6/.well-known/openid-configuration",
+    "client_id":  "1e54i5u8d418bsss8dncg8nclt",
+    "user_pool_id":  "us-west-2_hUvupv3K6"
+}
