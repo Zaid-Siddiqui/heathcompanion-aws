@@ -19,7 +19,8 @@
       "envVars": [
         { "name": "MODEL_ID", "value": "global.anthropic.claude-sonnet-4-6" },
         { "name": "GUARDRAIL_ID", "value": "aj1aucep040k" },
-        { "name": "GUARDRAIL_VERSION", "value": "DRAFT" }
+        { "name": "GUARDRAIL_VERSION", "value": "DRAFT" },
+        { "name": "DEFAULT_PATIENT_ID", "value": "PAT-01" }
       ],
       "additionalPolicies": ["runtime-policy.json"]
     }
@@ -171,6 +172,23 @@
                   "language": { "type": "string", "description": "'ar' or 'en'." }
                 },
                 "required": ["patient_id", "provider_id"]
+              }
+            },
+            {
+              "name": "record_vitals",
+              "description": "Log a home reading (blood pressure, blood glucose in mmol/L, resting heart rate) on the patient's record and grade it: normal, follow-up, urgent, or emergency (call 998). Returns the trend versus the previous reading and what to do next. Monitoring guidance only; the doctor sets personal targets.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "patient_id": { "type": "string", "description": "Patient id, e.g. PAT-01." },
+                  "systolic": { "type": "number", "description": "Systolic blood pressure in mmHg (top number)." },
+                  "diastolic": { "type": "number", "description": "Diastolic blood pressure in mmHg (bottom number)." },
+                  "glucose_mmol": { "type": "number", "description": "Blood glucose in mmol/L. Convert mg/dL by dividing by 18." },
+                  "heart_rate": { "type": "number", "description": "Resting heart rate in beats per minute." },
+                  "note": { "type": "string", "description": "Optional context, e.g. 'after breakfast', 'felt dizzy'." },
+                  "language": { "type": "string", "description": "'ar' or 'en'." }
+                },
+                "required": ["patient_id"]
               }
             },
             {

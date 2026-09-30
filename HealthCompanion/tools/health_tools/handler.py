@@ -329,6 +329,7 @@ def book_appointment(patient_id: str, provider_id: str, preferred_date: str | No
         ExpressionAttributeValues={":empty": [], ":new": [appointment]},
     )
     covered = patient.get("insurance") in _split_csv(provider.get("insurance"))
+    invite_uri = _write_calendar_invite(patient_id, appointment, patient.get("name", patient_id))
     confirmation = (
         f"Booked with {provider.get('name')} ({provider.get('specialty')}) at {provider.get('location')} on {date} at 14:00."
         if lang == "en" else
@@ -339,9 +340,35 @@ def book_appointment(patient_id: str, provider_id: str, preferred_date: str | No
         "appointment": appointment,
         "insurance_covered": covered,
         "confirmation": confirmation,
+        "calendar_invite": invite_uri,
         "reminder": _reminder(patient, reason or "", lang),
         "language": lang,
     }
+
+
+def _write_calendar_invite(patient_id: str, appt: dict, patient_name: str) -> str | None:
+    """Store an .ics invite next to the visit summaries so the booking is a real calendar event."""
+    start = appt["date"].replace("-", "") + "T" + appt["time"].replace(":", "") + "00"
+    end_hour = int(appt["time"][:2]) + 1
+    end = appt["date"].replace("-", "") + f"T{end_hour:02d}{appt['time'][3:]}00"
+    ics = "\r\n".join([
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Health Companion//EN", "BEGIN:VEVENT",
+        f"UID:{appt['appointment_id']}@healthcompanion",
+        f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
+        f"DTSTART;TZID=Asia/Dubai:{start}", f"DTEND;TZID=Asia/Dubai:{end}",
+        f"SUMMARY:{appt['specialty'].title()} visit - {appt['provider_name']}",
+        f"LOCATION:{appt['location']}",
+        f"DESCRIPTION:Patient {patient_name} ({patient_id}). Reason: {appt.get('reason') or 'see visit summary'}",
+        "END:VEVENT", "END:VCALENDAR", "",
+    ])
+    try:
+        bucket = os.environ.get("SUMMARIES_BUCKET") or _default_summaries_bucket()
+        key = f"appointments/{patient_id}/{appt['appointment_id']}.ics"
+        _s3.put_object(Bucket=bucket, Key=key, Body=ics.encode("utf-8"), ContentType="text/calendar; charset=utf-8")
+        return f"s3://{bucket}/{key}"
+    except Exception as exc:  # booking still stands if the invite fails
+        log.warning("calendar invite not written: %s", exc)
+        return None
 
 
 def _reminder(patient: dict, concern: str, lang: str) -> str:
@@ -362,6 +389,114 @@ def _reminder(patient: dict, concern: str, lang: str) -> str:
         "أي تنبيهات دوائية من هذه المحادثة ليؤكدها الطبيب",
     ]
     return "قبل موعدك، اذكر: " + "؛ ".join(items_ar) + "."
+
+
+# General adult reference ranges for *monitoring guidance only*. The patient's
+# doctor sets personal targets; we never interpret a reading as a diagnosis.
+SEVERITY_ORDER = ["normal", "follow-up", "urgent", "emergency"]
+
+
+def _grade_bp(sys_: float | None, dia: float | None) -> tuple[str, str]:
+    if sys_ is None and dia is None:
+        return "normal", ""
+    s, d = sys_ or 0, dia or 0
+    if s >= 180 or d >= 120:
+        return "emergency", f"Blood pressure {s:.0f}/{d:.0f} is in the severe range."
+    if s >= 140 or d >= 90:
+        return "urgent", f"Blood pressure {s:.0f}/{d:.0f} is high."
+    if (sys_ is not None and s < 90) or (dia is not None and d < 60):
+        return "urgent", f"Blood pressure {s:.0f}/{d:.0f} is low."
+    if s >= 130 or d >= 80:
+        return "follow-up", f"Blood pressure {s:.0f}/{d:.0f} is above the usual target range."
+    return "normal", f"Blood pressure {s:.0f}/{d:.0f} is within the usual range."
+
+
+def _grade_glucose(mmol: float | None) -> tuple[str, str]:
+    if mmol is None:
+        return "normal", ""
+    if mmol < 3.0 or mmol > 25:
+        return "emergency", f"Blood glucose {mmol:.1f} mmol/L is at a dangerous level."
+    if mmol < 3.9 or mmol > 16.7:
+        return "urgent", f"Blood glucose {mmol:.1f} mmol/L is outside the safe range."
+    if mmol > 10:
+        return "follow-up", f"Blood glucose {mmol:.1f} mmol/L is above the usual target."
+    return "normal", f"Blood glucose {mmol:.1f} mmol/L is within the usual range."
+
+
+def _grade_heart_rate(bpm: float | None) -> tuple[str, str]:
+    if bpm is None:
+        return "normal", ""
+    if bpm < 40 or bpm > 130:
+        return "emergency", f"Resting heart rate {bpm:.0f} bpm is at a dangerous level."
+    if bpm < 50 or bpm > 100:
+        return "urgent", f"Resting heart rate {bpm:.0f} bpm is outside the usual range."
+    return "normal", f"Resting heart rate {bpm:.0f} bpm is within the usual range."
+
+
+def record_vitals(patient_id: str, systolic: float | None = None, diastolic: float | None = None,
+                  glucose_mmol: float | None = None, heart_rate: float | None = None,
+                  note: str | None = None, language: str | None = None) -> dict:
+    patient = get_patient(patient_id)
+    if not patient:
+        return {"recorded": False, "error": f"unknown patient {patient_id}"}
+    lang = detect_language(note or "", language)
+    grades = {
+        "blood_pressure": _grade_bp(systolic, diastolic),
+        "glucose": _grade_glucose(glucose_mmol),
+        "heart_rate": _grade_heart_rate(heart_rate),
+    }
+    overall = max((g for g, _ in grades.values()), key=SEVERITY_ORDER.index)
+    findings = [msg for _, msg in grades.values() if msg]
+
+    reading = {
+        "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "systolic": systolic, "diastolic": diastolic, "glucose_mmol": glucose_mmol,
+        "heart_rate": heart_rate, "severity": overall, "note": note or "",
+    }
+    previous = (patient.get("vitals") or [])[-1] if patient.get("vitals") else None
+    trend = None
+    if previous:
+        deltas = {k: (reading[k] - float(previous[k])) for k in ("systolic", "diastolic", "glucose_mmol", "heart_rate")
+                  if reading.get(k) is not None and previous.get(k) is not None}
+        trend = {"since": previous.get("recorded_at"), "change": {k: round(v, 1) for k, v in deltas.items()}}
+
+    from decimal import Decimal  # DynamoDB rejects floats
+    item = {k: (Decimal(str(v)) if isinstance(v, float) else v) for k, v in reading.items() if v is not None}
+    _ddb.Table(param("patients-table")).update_item(
+        Key={"patient_id": patient_id},
+        UpdateExpression="SET vitals = list_append(if_not_exists(vitals, :empty), :new)",
+        ExpressionAttributeValues={":empty": [], ":new": [item]},
+    )
+
+    actions = {
+        "normal": ("Keep logging as usual; share the log at your next visit.",
+                   "استمر في التسجيل كالمعتاد وشارك السجل في زيارتك القادمة."),
+        "follow-up": ("Mention this to your doctor at your next visit, or book a routine check-up.",
+                      "اذكر هذا لطبيبك في زيارتك القادمة أو احجز فحصاً روتينياً."),
+        "urgent": ("Contact your doctor today. If you also have symptoms, do not wait.",
+                   "تواصل مع طبيبك اليوم. إذا كانت لديك أعراض أيضاً فلا تنتظر."),
+        "emergency": (f"Call {EMERGENCY_NUMBER} now, especially if you have any symptoms. Do not drive yourself.",
+                      f"اتصل بالرقم {EMERGENCY_NUMBER} الآن خاصة إن كانت لديك أعراض. لا تقد السيارة بنفسك."),
+    }
+    history = (patient.get("history") or "").lower()
+    context_note = None
+    if "hypertension" in history and grades["blood_pressure"][0] != "normal":
+        context_note = "You have hypertension on file, so your doctor may want a lower target; treat this as a prompt to check in."
+    if "diabet" in history and grades["glucose"][0] != "normal":
+        context_note = "You have diabetes on file; your doctor sets your personal glucose targets."
+
+    return {
+        "recorded": True,
+        "patient_id": patient_id,
+        "reading": reading,
+        "severity": overall,
+        "findings": findings,
+        "trend": trend,
+        "action": actions[overall][0] if lang == "en" else actions[overall][1],
+        "history_context": context_note,
+        "disclaimer": "General adult reference ranges for monitoring only; not a diagnosis. Your doctor sets your personal targets.",
+        "language": lang,
+    }
 
 
 def create_visit_summary(patient_id: str, symptoms: str, urgency: str, specialty: str | None = None,
@@ -419,6 +554,7 @@ TOOLS = {
     "check_medications": check_medications,
     "find_specialist": find_specialist,
     "book_appointment": book_appointment,
+    "record_vitals": record_vitals,
     "create_visit_summary": create_visit_summary,
 }
 

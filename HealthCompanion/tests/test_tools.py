@@ -136,14 +136,28 @@ def test_find_specialist_falls_back_to_general(monkeypatch):
     assert out["providers"][0]["specialty"] == "general"
 
 
-def test_book_appointment_records_on_patient(monkeypatch):
+def test_book_appointment_records_on_patient_and_writes_invite(monkeypatch):
     ddb = _stub(monkeypatch)
+    captured = {}
+    monkeypatch.setattr(h._s3, "put_object", lambda **kw: captured.update(kw))
+    monkeypatch.setattr(h, "_default_summaries_bucket", lambda: "bucket")
     out = h.book_appointment("PAT-01", "PRV-01", reason="headache with blurry vision", language="en")
     assert out["booked"] is True
     assert out["appointment"]["date"] == "2026-08-25"
     assert out["insurance_covered"] is True
     assert "mention" in out["reminder"]
     assert ddb.tables["workshop-health-patients"].updates, "booking must be persisted"
+    assert out["calendar_invite"].startswith("s3://bucket/appointments/PAT-01/")
+    assert b"BEGIN:VEVENT" in captured["Body"] and b"Asia/Dubai" in captured["Body"]
+
+
+def test_book_appointment_survives_invite_failure(monkeypatch):
+    _stub(monkeypatch)
+    monkeypatch.setattr(h, "_default_summaries_bucket", lambda: (_ for _ in ()).throw(RuntimeError("no bucket")))
+    out = h.book_appointment("PAT-01", "PRV-04", language="ar")
+    assert out["booked"] is True
+    assert out["calendar_invite"] is None
+    assert out["confirmation"].startswith("تم الحجز")
 
 
 def test_visit_summary_is_bilingual_and_has_no_diagnosis(monkeypatch):
@@ -157,6 +171,44 @@ def test_visit_summary_is_bilingual_and_has_no_diagnosis(monkeypatch):
     assert "ملخص الزيارة" in out["summary"] and "Visit summary" in out["summary"]
     assert "diagnos" not in out["summary"].lower().replace("no diagnosis", "")
     assert captured["ContentType"].startswith("text/markdown")
+
+
+# ---- vitals -------------------------------------------------------------------
+
+def test_vitals_normal(monkeypatch):
+    ddb = _stub(monkeypatch)
+    out = h.record_vitals("PAT-01", systolic=118, diastolic=76, heart_rate=68, language="en")
+    assert out["severity"] == "normal"
+    assert out["trend"] is None
+    assert ddb.tables["workshop-health-patients"].updates
+
+
+def test_vitals_high_bp_with_hypertension_is_urgent(monkeypatch):
+    _stub(monkeypatch)
+    out = h.record_vitals("PAT-01", systolic=152, diastolic=94)
+    assert out["severity"] == "urgent"
+    assert "hypertension" in out["history_context"]
+    assert "today" in out["action"]
+
+
+def test_vitals_crisis_is_emergency_998(monkeypatch):
+    _stub(monkeypatch)
+    out = h.record_vitals("PAT-01", systolic=185, diastolic=122, language="ar")
+    assert out["severity"] == "emergency"
+    assert "998" in out["action"]
+
+
+def test_vitals_glucose_and_trend(monkeypatch):
+    _stub(monkeypatch)
+    PATIENTS["PAT-02"]["vitals"] = [{"recorded_at": "2026-09-29T08:00:00+00:00", "glucose_mmol": 7.5}]
+    try:
+        out = h.record_vitals("PAT-02", glucose_mmol=12.0)
+        assert out["severity"] == "follow-up"
+        assert out["trend"]["change"]["glucose_mmol"] == 4.5
+        assert "diabetes" in out["history_context"]
+        assert h.record_vitals("PAT-02", glucose_mmol=2.5)["severity"] == "emergency"
+    finally:
+        PATIENTS["PAT-02"].pop("vitals", None)
 
 
 # ---- lambda routing -----------------------------------------------------------

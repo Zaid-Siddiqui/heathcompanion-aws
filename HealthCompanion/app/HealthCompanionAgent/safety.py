@@ -119,6 +119,37 @@ def dosing_refusal(lang: str) -> str:
     )
 
 
+def diagnosis_refusal(lang: str) -> str:
+    if lang == "ar":
+        return ("لا أستطيع تشخيص الحالات، فهذا يحتاج فحصاً من طبيب. لكن أستطيع مساعدتك في معرفة مدى استعجال الأمر "
+                "والطبيب المناسب. صِف لي الأعراض ومتى بدأت.")
+    return ("I can't diagnose — that needs a doctor's examination. What I can do is help you judge how urgent this is "
+            "and who the right doctor is. Tell me your symptoms and when they started.")
+
+
+def treatment_refusal(lang: str) -> str:
+    if lang == "ar":
+        return ("لا أستطيع اقتراح علاج أو وصفة منزلية؛ هذا قرار الطبيب أو الصيدلي. أستطيع مساعدتك في معرفة درجة "
+                "الاستعجال وحجز موعد مع الطبيب المناسب.")
+    return ("I can't recommend a treatment or home remedy — that's for your doctor or pharmacist to decide. I can help "
+            "you judge the urgency and book the right doctor.")
+
+
+def guardrail_block_message(lang: str) -> str:
+    if lang == "ar":
+        return "لا أستطيع المساعدة في هذا الطلب. لنبقَ في ما أستطيع مساعدتك فيه بأمان: الأعراض ودرجة الاستعجال والطبيب المناسب."
+    return ("I can't help with that request. Let's keep to what I can safely help with: your symptoms, how urgent they "
+            "are, and the right doctor to see.")
+
+
+# Baseline guardrail topic name → refusal that keeps the user on a safe path.
+GUARDRAIL_TOPIC_RESPONSES = {
+    "MedicalDiagnosis": diagnosis_refusal,
+    "MedicationDosing": dosing_refusal,
+    "TreatmentRecommendation": treatment_refusal,
+}
+
+
 def diagnosis_reframe(text: str, lang: str) -> str:
     note = (
         "[Safety note: the user asked for a diagnosis. Do NOT name a disease or condition. Say briefly, in the "

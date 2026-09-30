@@ -101,13 +101,20 @@ def local_tools() -> list:
         return h.book_appointment(patient_id, provider_id, preferred_date, reason, language)
 
     @tool
+    def record_vitals(patient_id: str, systolic: float | None = None, diastolic: float | None = None,
+                      glucose_mmol: float | None = None, heart_rate: float | None = None,
+                      note: str | None = None, language: str | None = None) -> dict:
+        """Log a home reading (BP mmHg, glucose mmol/L, resting heart rate) and grade it normal/follow-up/urgent/emergency with trend."""
+        return h.record_vitals(patient_id, systolic, diastolic, glucose_mmol, heart_rate, note, language)
+
+    @tool
     def create_visit_summary(patient_id: str, symptoms: str, urgency: str, specialty: str | None = None,
                              interaction_flags: str | None = None, language: str | None = None) -> dict:
         """Write a bilingual doctor-ready visit summary to S3 and return its location, text and reminder."""
         return h.create_visit_summary(patient_id, symptoms, urgency, specialty, interaction_flags, language)
 
     return [triage_symptoms, get_patient_history, check_medications, find_specialist, book_appointment,
-            create_visit_summary]
+            record_vitals, create_visit_summary]
 
 
 def load_tools() -> list:
