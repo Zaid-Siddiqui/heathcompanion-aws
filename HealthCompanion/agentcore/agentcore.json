@@ -1,0 +1,186 @@
+{
+  "$schema": "https://schema.agentcore.aws.dev/v1/agentcore.json",
+  "name": "HealthCompanion",
+  "version": 1,
+  "managedBy": "CDK",
+  "tags": {
+    "agentcore:created-by": "agentcore-cli",
+    "agentcore:project-name": "HealthCompanion"
+  },
+  "runtimes": [
+    {
+      "name": "HealthCompanionAgent",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "app/HealthCompanionAgent/",
+      "runtimeVersion": "PYTHON_3_12",
+      "networkMode": "PUBLIC",
+      "protocol": "HTTP"
+    }
+  ],
+  "memories": [
+    {
+      "name": "HealthMemory",
+      "eventExpiryDuration": 7,
+      "strategies": [
+        {
+          "type": "USER_PREFERENCE",
+          "namespaceTemplates": [
+            "/users/{actorId}/preferences"
+          ]
+        },
+        {
+          "type": "SEMANTIC",
+          "namespaceTemplates": [
+            "/users/{actorId}/facts"
+          ]
+        }
+      ]
+    }
+  ],
+  "knowledgeBases": [],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [
+    {
+      "name": "health-tools",
+      "protocolType": "MCP",
+      "description": "Health Companion clinical tools",
+      "targets": [
+        {
+          "name": "health-lambda-tools",
+          "targetType": "lambda",
+          "compute": {
+            "host": "Lambda",
+            "implementation": {
+              "language": "Python",
+              "path": "tools/health_tools",
+              "handler": "handler.py"
+            },
+            "pythonVersion": "PYTHON_3_12",
+            "timeout": 60,
+            "memorySize": 512,
+            "iamPolicy": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "ReadWorkshopParameters",
+                  "Effect": "Allow",
+                  "Action": ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"],
+                  "Resource": "arn:aws:ssm:us-west-2:254266883591:parameter/app/workshop/*"
+                },
+                {
+                  "Sid": "HealthTables",
+                  "Effect": "Allow",
+                  "Action": ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
+                  "Resource": "arn:aws:dynamodb:us-west-2:254266883591:table/workshop-health-*"
+                },
+                {
+                  "Sid": "GuidelinesKnowledgeBase",
+                  "Effect": "Allow",
+                  "Action": ["bedrock:Retrieve", "bedrock:InvokeModel"],
+                  "Resource": "*"
+                },
+                {
+                  "Sid": "VisitSummaries",
+                  "Effect": "Allow",
+                  "Action": ["s3:PutObject", "s3:GetObject", "s3:ListBucket"],
+                  "Resource": [
+                    "arn:aws:s3:::workshop-health-*",
+                    "arn:aws:s3:::workshop-health-*/*"
+                  ]
+                },
+                {
+                  "Sid": "Translate",
+                  "Effect": "Allow",
+                  "Action": ["translate:TranslateText"],
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          "toolDefinitions": [
+            {
+              "name": "triage_symptoms",
+              "description": "Gauge the urgency of described symptoms against the clinical triage guidelines knowledge base. Returns an urgency level (emergency, urgent, routine, self-care), the suggested specialty, and the cited guideline passage. Never returns a diagnosis.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "symptoms": { "type": "string", "description": "The symptoms in the user's own words (Arabic or English)." },
+                  "patient_id": { "type": "string", "description": "Optional patient id (e.g. PAT-01) so existing conditions can raise urgency." },
+                  "language": { "type": "string", "description": "Preferred response language: 'ar' or 'en'." }
+                },
+                "required": ["symptoms"]
+              }
+            },
+            {
+              "name": "get_patient_history",
+              "description": "Fetch a patient's record: known conditions, current medications, allergies, insurance plan and preferred language.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "patient_id": { "type": "string", "description": "Patient id, e.g. PAT-01." }
+                },
+                "required": ["patient_id"]
+              }
+            },
+            {
+              "name": "check_medications",
+              "description": "Flag possible interactions or red flags between the patient's current medications, any newly mentioned medications, and the reported symptoms, using the medication reference. Flags are for a pharmacist or doctor to confirm; this never recommends a dose or a change.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "patient_id": { "type": "string", "description": "Patient id, e.g. PAT-01." },
+                  "symptoms": { "type": "string", "description": "Reported symptoms." },
+                  "additional_medications": { "type": "string", "description": "Comma-separated medications the user mentions that are not yet on record." }
+                },
+                "required": ["patient_id", "symptoms"]
+              }
+            },
+            {
+              "name": "find_specialist",
+              "description": "Find providers matching a specialty, ordered by insurance coverage then earliest availability. Falls back to a general practitioner when no specialist matches.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "specialty": { "type": "string", "description": "Specialty to match, e.g. cardiology, neurology, ophthalmology, general." },
+                  "insurance": { "type": "string", "description": "Patient's insurance plan, e.g. PlanA." },
+                  "language": { "type": "string", "description": "Preferred consultation language: 'ar' or 'en'." },
+                  "location": { "type": "string", "description": "Preferred area or clinic name." }
+                },
+                "required": ["specialty"]
+              }
+            },
+            {
+              "name": "create_visit_summary",
+              "description": "Write a bilingual (Arabic + English) doctor-ready visit summary to S3 and return its location plus the summary text. Contains the concern, symptoms, history, medications, allergies and any interaction flags. Contains no diagnosis or treatment.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "patient_id": { "type": "string", "description": "Patient id, e.g. PAT-01." },
+                  "symptoms": { "type": "string", "description": "Symptoms in the user's own words, with onset and progression if known." },
+                  "urgency": { "type": "string", "description": "Urgency level from triage_symptoms." },
+                  "specialty": { "type": "string", "description": "Recommended specialty or provider name." },
+                  "interaction_flags": { "type": "string", "description": "Any flags returned by check_medications." },
+                  "language": { "type": "string", "description": "Language the user wrote in: 'ar' or 'en'." }
+                },
+                "required": ["patient_id", "symptoms", "urgency"]
+              }
+            }
+          ]
+        }
+      ],
+      "authorizerType": "AWS_IAM",
+      "enableSemanticSearch": true,
+      "exceptionLevel": "NONE"
+    }
+  ],
+  "policyEngines": [],
+  "configBundles": [],
+  "abTests": [],
+  "harnesses": [],
+  "datasets": [],
+  "capacityProviders": [],
+  "payments": []
+}

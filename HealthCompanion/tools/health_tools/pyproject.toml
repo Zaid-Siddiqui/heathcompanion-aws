@@ -1,0 +1,9 @@
+[project]
+name = "health-tools"
+version = "0.1.0"
+description = "Health Companion Gateway tools: triage, patient history, medications, specialist lookup, visit summary"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false
