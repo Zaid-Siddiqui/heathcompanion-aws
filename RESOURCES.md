@@ -79,11 +79,19 @@ Grants: DynamoDB CRUD on `workshop-*`, `bedrock:Retrieve|RetrieveAndGenerate|Inv
 
 Recommended: `global.anthropic.claude-sonnet-4-6` (fast, strong Arabic) for the agent; `us.anthropic.claude-haiku-4-5-20251001-v1:0` if we need a cheap classifier. Also present: `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-fable-5-1`.
 
-## Not yet created (we create these)
+## Deployed by us (stack `AgentCore-HealthCompanion-default`, 2026-09-30)
 
-- AgentCore Memory (none exist) — `agentcore add` → Memory; strategies: user-preference (language) + semantic (symptom history)
-- AgentCore Gateway (none exist) — `agentcore add` → Gateway with the five Lambda tools
-- AgentCore Runtime + project scaffold — `agentcore create`
+| Resource | Id / URL |
+|---|---|
+| Runtime | `arn:aws:bedrock-agentcore:us-west-2:254266883591:runtime/HealthCompanion_HealthCompanionAgent-ABwSEU88dH` |
+| Memory (USER_PREFERENCE + SEMANTIC, 7-day) | `HealthCompanion_HealthMemory-bMJEFtF7od` |
+| Gateway (MCP, AWS_IAM) | `https://healthcompanion-health-tools-ii80nl7agq.gateway.bedrock-agentcore.us-west-2.amazonaws.com/mcp` |
+| Gateway target (7 tools) | `DVGE6THINA` → Lambda `HealthCompanion-health-lambda-tools` |
+| Cognito (web UI sign-in) | pool `us-west-2_hUvupv3K6`, client `1e54i5u8d418bsss8dncg8nclt` |
+| CDK asset bucket | `workshop-cdk-assets-254266883591-us-west-2` |
+
+Deployed with `node node_modules/aws-cdk/bin/cdk deploy` from `agentcore/cdk` (see cdk.ts: `CliCredentialsStackSynthesizer`),
+because the participant role cannot create `cdk-*` bootstrap roles. `npx cdk` exits silently under Git Bash on Windows.
 
 ## Tool ↔ resource mapping
 

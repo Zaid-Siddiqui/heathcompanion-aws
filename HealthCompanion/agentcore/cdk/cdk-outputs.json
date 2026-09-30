@@ -1,0 +1,18 @@
+{
+  "AgentCore-HealthCompanion-default": {
+    "GatewayHealthToolsArnOutput": "arn:aws:bedrock-agentcore:us-west-2:254266883591:gateway/healthcompanion-health-tools-ii80nl7agq",
+    "GatewayHealthToolsIdOutput": "healthcompanion-health-tools-ii80nl7agq",
+    "ApplicationAgentHealthCompanionAgentRuntimeArnOutputC99B89A3": "arn:aws:bedrock-agentcore:us-west-2:254266883591:runtime/HealthCompanion_HealthCompanionAgent-ABwSEU88dH",
+    "ApplicationMemoryIds538D889E": "HealthCompanion_HealthMemory-bMJEFtF7od",
+    "ApplicationAgentHealthCompanionAgentRuntimeIdOutputAEEFFF96": "HealthCompanion_HealthCompanionAgent-ABwSEU88dH",
+    "ApplicationMemoryNames676588DB": "HealthMemory",
+    "GatewayTargetHealthLambdaToolsIdOutput": "DVGE6THINA",
+    "ApplicationAgentHealthCompanionAgentRoleArnOutputFF09EB16": "arn:aws:iam::254266883591:role/AgentCore-HealthCompanion-ApplicationAgentHealthCom-K0MJL6WeGsZQ",
+    "GatewayHealthToolsUrlOutput": "https://healthcompanion-health-tools-ii80nl7agq.gateway.bedrock-agentcore.us-west-2.amazonaws.com/mcp",
+    "ApplicationMemoryHealthMemoryIdOutput293C6A10": "HealthCompanion_HealthMemory-bMJEFtF7od",
+    "ApplicationMemoryHealthMemoryArnOutput88A02B57": "arn:aws:bedrock-agentcore:us-west-2:254266883591:memory/HealthCompanion_HealthMemory-bMJEFtF7od",
+    "McpMcpLambdaHealthLambdaToolsArnOutputB5FE1E69": "arn:aws:lambda:us-west-2:254266883591:function:HealthCompanion-health-lambda-tools",
+    "McpMcpLambdaHealthLambdaToolsNameOutputD75B64CA": "HealthCompanion-health-lambda-tools",
+    "StackNameOutput": "AgentCore-HealthCompanion-default"
+  }
+}

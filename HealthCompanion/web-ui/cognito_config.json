@@ -1,6 +1,7 @@
 {
-    "region":  "us-west-2",
-    "discovery_url":  "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_hUvupv3K6/.well-known/openid-configuration",
-    "client_id":  "1e54i5u8d418bsss8dncg8nclt",
-    "user_pool_id":  "us-west-2_hUvupv3K6"
+  "region": "us-west-2",
+  "user_pool_id": "us-west-2_hUvupv3K6",
+  "client_id": "1e54i5u8d418bsss8dncg8nclt",
+  "discovery_url": "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_hUvupv3K6/.well-known/openid-configuration",
+  "runtime_arn": "arn:aws:bedrock-agentcore:us-west-2:254266883591:runtime/HealthCompanion_HealthCompanionAgent-ABwSEU88dH"
 }
