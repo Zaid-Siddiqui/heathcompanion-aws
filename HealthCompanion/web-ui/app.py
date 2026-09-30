@@ -39,7 +39,7 @@ STRINGS = {
         "thinking": "Checking the guidelines…",
         "speak": "🎤 Speak",
         "stop": "⏹ Stop",
-        "voice_hint": "Tap Speak, describe your symptoms, tap Stop — works in Chrome/Edge.",
+        "voice_hint": "Tap Speak, describe your symptoms, tap Stop. Needs Chrome or Edge (Brave blocks speech recognition).",
     },
     "ar": {
         "title": "رفيق الصحة",
@@ -198,6 +198,23 @@ def main() -> None:
         return
 
     patient_id = st.sidebar.selectbox(text["patient"], list(PATIENTS), format_func=lambda p: f"{p} · {PATIENTS[p]}")
+
+    # Voice: browser speech recognition (Web Speech API) → transcript used as the prompt.
+    spoken = None
+    try:
+        from streamlit_mic_recorder import speech_to_text
+
+        with st.sidebar:
+            st.markdown("---")
+            spoken = speech_to_text(
+                language=SPEECH_LANG[lang], start_prompt=text["speak"], stop_prompt=text["stop"],
+                use_container_width=True, key="voice",
+            )
+            st.caption(text["voice_hint"])
+            st.markdown("---")
+    except ImportError:
+        pass
+
     st.sidebar.caption(f"actor: {st.session_state['actor_id']} · session: {st.session_state['session_id'][:8]}…")
     if st.sidebar.button(text["logout"]):
         st.session_state.clear()
@@ -210,19 +227,6 @@ def main() -> None:
     for role, message in st.session_state["history"]:
         with st.chat_message(role):
             st.markdown(message)
-
-    # Voice: browser speech recognition (Web Speech API) → transcript used as the prompt.
-    spoken = None
-    try:
-        from streamlit_mic_recorder import speech_to_text
-
-        spoken = speech_to_text(
-            language=SPEECH_LANG[lang], start_prompt=text["speak"], stop_prompt=text["stop"],
-            just_once=True, use_container_width=False, key="voice",
-        )
-        st.caption(text["voice_hint"])
-    except ImportError:
-        pass
 
     prompt = st.chat_input(text["input"]) or spoken
     if prompt:
