@@ -1,0 +1,22 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Stub CDK toolkit stack for the hackathon workshop account. The participant role
+  cannot create the cdk-* bootstrap roles, so the project deploys with
+  CliCredentialsStackSynthesizer (no roles) and a workshop-* asset bucket. This
+  stack only exists so the AgentCore CLI's bootstrap check (CDKToolkit stack with a
+  BootstrapVersion output) passes and its deploy/logs/eval tooling can be used.
+Resources:
+  CdkBootstrapVersion:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /cdk-bootstrap/hnb659fds/version
+      Type: String
+      Value: "21"
+      Description: Stub bootstrap version (no toolkit roles; see stack description)
+Outputs:
+  BootstrapVersion:
+    Description: CDK bootstrap version reported to the CDK/AgentCore CLIs
+    Value: "21"
+  BucketName:
+    Description: Asset bucket used by CliCredentialsStackSynthesizer
+    Value: workshop-cdk-assets-254266883591-us-west-2
