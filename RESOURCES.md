@@ -93,4 +93,15 @@ Recommended: `global.anthropic.claude-sonnet-4-6` (fast, strong Arabic) for the 
 | `get_patient_history` | `workshop-health-patients` by `patient_id` | — |
 | `check_medications` | patient `medications` + KB medication doc | — |
 | `find_specialist` | `workshop-health-providers` (scan + filter specialty/insurance) | — |
-| `create_visit_summary` | all of the above | S3 `summaries/<patient_id>/<ts>.md` (bucket TBD) |
+| `book_appointment` | providers + patients | `UpdateItem` appends to `appointments` list on the patient item |
+| `create_visit_summary` | all of the above | S3 `summaries/<patient_id>/<ts>.md` in the health KB bucket |
+
+## AgentCore CLI 0.31 quirks learned
+
+- `agentcore create/add` are fully scriptable with flags; in PowerShell quote comma lists (`--strategies "A,B"`).
+- The CLI's `--type` list has no plain Lambda target; write `targetType: "lambda"` + `compute.host: "Lambda"` by hand.
+  `implementation.handler` is passed verbatim as the Lambda `Handler` → use `handler.handler`, not `handler.py`.
+- Each Lambda tool dir needs a `pyproject.toml` (packaged with `uv`; `uv` must be on PATH for synth).
+- Deployment targets must exist in `aws-targets.json` before synth.
+- To synth outside the CLI: `cd agentcore/cdk && npm run build && CDK_OUTDIR=cdk.out node dist/bin/cdk.js`.
+- Runtime env vars injected by CDK: `MEMORY_<NAME>_ID`, `AGENTCORE_GATEWAY_<NAME>_URL`, `AGENTCORE_GATEWAY_<NAME>_AUTH_TYPE`.

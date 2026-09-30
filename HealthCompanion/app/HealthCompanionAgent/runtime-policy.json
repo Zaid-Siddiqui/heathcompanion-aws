@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ApplyBaselineGuardrail",
+      "Effect": "Allow",
+      "Action": ["bedrock:ApplyGuardrail"],
+      "Resource": "arn:aws:bedrock:us-west-2:254266883591:guardrail/aj1aucep040k"
+    },
+    {
+      "Sid": "InvokeGatewayTools",
+      "Effect": "Allow",
+      "Action": ["bedrock-agentcore:InvokeGateway"],
+      "Resource": "*"
+    }
+  ]
+}

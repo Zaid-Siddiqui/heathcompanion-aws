@@ -15,7 +15,13 @@
       "codeLocation": "app/HealthCompanionAgent/",
       "runtimeVersion": "PYTHON_3_12",
       "networkMode": "PUBLIC",
-      "protocol": "HTTP"
+      "protocol": "HTTP",
+      "envVars": [
+        { "name": "MODEL_ID", "value": "global.anthropic.claude-sonnet-4-6" },
+        { "name": "GUARDRAIL_ID", "value": "aj1aucep040k" },
+        { "name": "GUARDRAIL_VERSION", "value": "DRAFT" }
+      ],
+      "additionalPolicies": ["runtime-policy.json"]
     }
   ],
   "memories": [
@@ -56,7 +62,7 @@
             "implementation": {
               "language": "Python",
               "path": "tools/health_tools",
-              "handler": "handler.py"
+              "handler": "handler.handler"
             },
             "pythonVersion": "PYTHON_3_12",
             "timeout": 60,
@@ -73,7 +79,7 @@
                 {
                   "Sid": "HealthTables",
                   "Effect": "Allow",
-                  "Action": ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan"],
+                  "Action": ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:UpdateItem"],
                   "Resource": "arn:aws:dynamodb:us-west-2:254266883591:table/workshop-health-*"
                 },
                 {
@@ -150,6 +156,21 @@
                   "location": { "type": "string", "description": "Preferred area or clinic name." }
                 },
                 "required": ["specialty"]
+              }
+            },
+            {
+              "name": "book_appointment",
+              "description": "Book an appointment with a provider returned by find_specialist. Records it on the patient's file and returns the confirmed date, clinic, and a reminder of what to mention. Never books for emergency-level cases; those must call 998.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "patient_id": { "type": "string", "description": "Patient id, e.g. PAT-01." },
+                  "provider_id": { "type": "string", "description": "Provider id from find_specialist, e.g. PRV-01." },
+                  "preferred_date": { "type": "string", "description": "Optional preferred date (YYYY-MM-DD). Must not be earlier than the provider's next availability." },
+                  "reason": { "type": "string", "description": "Short reason for the visit, in the user's words." },
+                  "language": { "type": "string", "description": "'ar' or 'en'." }
+                },
+                "required": ["patient_id", "provider_id"]
               }
             },
             {

@@ -41,20 +41,23 @@ POLICE_NUMBER = "999"
 EMERGENCY_PATTERNS = [
     r"chest (pain|pressure|tight)", r"left arm (numb|pain)", r"jaw pain",
     r"(can'?t|cannot|difficult(y)?|trouble|short(ness)? of) breath",
-    r"(face|facial) droop", r"slurred speech", r"one[- ]sided (weak|numb)",
+    r"(face|facial).{0,12}droop", r"slurred speech", r"speech.{0,12}slurred", r"one[- ]sided (weak|numb)",
     r"(sudden|worst).{0,20}headache", r"sudden .{0,15}(vision|sight) loss",
     r"(severe|heavy|uncontrolled) bleeding", r"seizure", r"faint(ed|ing)?",
     r"unconscious", r"stiff neck.{0,20}fever", r"(swelling|swollen).{0,30}(throat|tongue)",
     r"ألم (في )?الصدر", r"ضغط (في )?الصدر", r"خدر (في )?(الذراع|اليد) (الأيسر|اليسرى)",
     r"ضيق (في )?التنفس", r"صعوبة (في )?التنفس", r"تدلي (في )?الوجه", r"تلعثم",
-    r"ضعف (في )?جانب واحد", r"أسوأ صداع", r"صداع مفاجئ", r"فقدان (مفاجئ )?(ال)?(بصر|رؤية)",
-    r"نزيف (شديد|حاد|غزير)", r"نوبة (صرع)?", r"إغماء", r"فقدان الوعي", r"تورم (في )?(الحلق|اللسان)",
+    r"ضعف (في )?جانب واحد", r"أسوأ صداع", r"صداع مفاجئ", r"فقدان (مفاجئ )?(ال|لل)?(بصر|رؤية|نظر)",
+    r"نزيف (شديد|حاد|غزير)", r"نوبة (صرع)?", r"إغماء", r"اغماء", r"(أغمي|اغمي) علي", r"فقدان الوعي",
+    r"تورم (في )?(الحلق|اللسان)",
 ]
 
 URGENT_PATTERNS = [
     r"high fever", r"fever.{0,30}(days|won'?t|not going)", r"infect", r"pus",
-    r"vision (change|blur)", r"blurr?ed", r"worse(ning)? (over|for|since)", r"exertion",
-    r"حمى (شديدة|مرتفعة)", r"التهاب", r"صديد", r"(تشوش|تغير) (في )?الرؤية", r"يزداد سوء",
+    r"vision.{0,15}(change|blur)", r"blurr?(y|ed)", r"worse(ning)? (over|for|since)", r"exertion",
+    r"headache.{0,40}(days|week|vision)", r"(for|since) \d+ days",
+    r"حمى (شديدة|مرتفعة)", r"التهاب", r"صديد", r"(تشوش|تغير|مشوش).{0,10}(الرؤية|رؤيتي|النظر)", r"رؤيتي مشوشة",
+    r"يزداد سوء", r"صداع.{0,30}(أيام|ايام|أسبوع|رؤي)", r"منذ \S+ (أيام|ايام)",
 ]
 
 SELF_CARE_PATTERNS = [
@@ -295,6 +298,72 @@ def find_specialist(specialty: str, insurance: str | None = None, language: str 
     }
 
 
+def book_appointment(patient_id: str, provider_id: str, preferred_date: str | None = None,
+                     reason: str | None = None, language: str | None = None) -> dict:
+    lang = detect_language(reason or "", language)
+    providers = _ddb.Table(param("providers-table"))
+    provider = providers.get_item(Key={"provider_id": provider_id}).get("Item")
+    if not provider:
+        return {"booked": False, "error": f"unknown provider {provider_id}"}
+    patient = get_patient(patient_id)
+    if not patient:
+        return {"booked": False, "error": f"unknown patient {patient_id}"}
+
+    earliest = provider.get("next_available", "")
+    date = preferred_date if preferred_date and preferred_date >= earliest else earliest
+    appointment = {
+        "appointment_id": f"APT-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+        "provider_id": provider_id,
+        "provider_name": provider.get("name"),
+        "specialty": provider.get("specialty"),
+        "location": provider.get("location"),
+        "date": date,
+        "time": "14:00",
+        "reason": reason or "",
+        "booked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    # No appointments table in the starter data, so the booking lives on the patient record.
+    _ddb.Table(param("patients-table")).update_item(
+        Key={"patient_id": patient_id},
+        UpdateExpression="SET appointments = list_append(if_not_exists(appointments, :empty), :new)",
+        ExpressionAttributeValues={":empty": [], ":new": [appointment]},
+    )
+    covered = patient.get("insurance") in _split_csv(provider.get("insurance"))
+    confirmation = (
+        f"Booked with {provider.get('name')} ({provider.get('specialty')}) at {provider.get('location')} on {date} at 14:00."
+        if lang == "en" else
+        f"تم الحجز مع {provider.get('name')} ({provider.get('specialty')}) في {provider.get('location')} بتاريخ {date} الساعة 14:00."
+    )
+    return {
+        "booked": True,
+        "appointment": appointment,
+        "insurance_covered": covered,
+        "confirmation": confirmation,
+        "reminder": _reminder(patient, reason or "", lang),
+        "language": lang,
+    }
+
+
+def _reminder(patient: dict, concern: str, lang: str) -> str:
+    items_en = [
+        f"your main concern: {concern}" if concern else "your main concern and when it started",
+        f"conditions on file: {patient.get('history', 'none')}",
+        f"medications you take: {patient.get('medications', 'none')}",
+        f"allergies: {patient.get('allergies', 'none')}",
+        "any medication flags from this chat, for the doctor to confirm",
+    ]
+    if lang == "en":
+        return "Before your appointment, mention: " + "; ".join(items_en) + "."
+    items_ar = [
+        f"شكواك الرئيسية: {concern}" if concern else "شكواك الرئيسية ومتى بدأت",
+        f"الحالات المسجلة: {patient.get('history', 'لا يوجد')}",
+        f"الأدوية التي تتناولها: {patient.get('medications', 'لا يوجد')}",
+        f"الحساسية: {patient.get('allergies', 'لا يوجد')}",
+        "أي تنبيهات دوائية من هذه المحادثة ليؤكدها الطبيب",
+    ]
+    return "قبل موعدك، اذكر: " + "؛ ".join(items_ar) + "."
+
+
 def create_visit_summary(patient_id: str, symptoms: str, urgency: str, specialty: str | None = None,
                          interaction_flags: str | None = None, language: str | None = None) -> dict:
     p = get_patient(patient_id) or {}
@@ -332,7 +401,7 @@ def create_visit_summary(patient_id: str, symptoms: str, urgency: str, specialty
     bucket = os.environ.get("SUMMARIES_BUCKET") or _default_summaries_bucket()
     key = f"summaries/{patient_id}/{now.strftime('%Y%m%dT%H%M%SZ')}.md"
     _s3.put_object(Bucket=bucket, Key=key, Body=body.encode("utf-8"), ContentType="text/markdown; charset=utf-8")
-    return {"s3_uri": f"s3://{bucket}/{key}", "summary": body, "language": lang}
+    return {"s3_uri": f"s3://{bucket}/{key}", "summary": body, "reminder": _reminder(p, symptoms, lang), "language": lang}
 
 
 @lru_cache(maxsize=1)
@@ -349,6 +418,7 @@ TOOLS = {
     "get_patient_history": get_patient_history,
     "check_medications": check_medications,
     "find_specialist": find_specialist,
+    "book_appointment": book_appointment,
     "create_visit_summary": create_visit_summary,
 }
 
