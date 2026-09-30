@@ -32,6 +32,21 @@ Cross-cutting: AgentCore **Memory** (symptom history, preferred language), Agent
 - Responds in the user's language (Arabic or English).
 - PHI stays in-region (`me-central-1` in production; `us-west-2` for the hackathon).
 
+### How the layers stack
+
+| Layer | Where | Catches |
+|---|---|---|
+| `safety.py` (deterministic, bilingual regex) | before anything else | emergency red flags → 998; dosing questions → refusal; diagnosis requests → reframed so triage still runs |
+| Baseline Bedrock Guardrail (`ApplyGuardrail`, source=INPUT) | on the raw user message | prompt attacks, hate/violence/sexual/misconduct, and its `MedicalDiagnosis` / `MedicationDosing` / `TreatmentRecommendation` topics — each mapped to a specific, useful refusal instead of the generic block text |
+| System prompt + tool design | model + tools | tools never return a diagnosis or dose; interaction flags are always "for your doctor or pharmacist to confirm" |
+
+Why the guardrail is applied on input rather than through the model's `guardrailConfig`: probing the baseline
+with `ApplyGuardrail(source=OUTPUT)` showed it blocks the *compliant* phrasing the track requires
+("I can't diagnose, but…" → `MedicalDiagnosis`; "flag for your doctor to confirm" → `MedicationDosing`),
+which would silently replace correct answers. The same probe found its `PROMPT_ATTACK` filter fires at MEDIUM
+confidence on ordinary patient phrasing ("Patient PAT-01 here, can you check my history…"), so only HIGH-confidence
+prompt-attack detections block; the rest are logged.
+
 ## Layout
 
 ```
