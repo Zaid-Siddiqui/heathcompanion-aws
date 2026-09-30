@@ -1,4 +1,0 @@
-﻿data: {"event": {"contentBlockDelta": {"delta": {"text": "I can't tell you how much of a medication to take or change a dose. The right dose depends on your weight, your condition, and what else you take.\nBest next step: ask a pharmacist (available at any pharmacy without an appointment) or your doctor. If you like, I can review your current medications for anything worth mentioning to them, or help you find the right doctor."}, "contentBlockIndex": 0}}}
-
-data: {"event": {"messageStop": {"stopReason": "end_turn"}}}
-

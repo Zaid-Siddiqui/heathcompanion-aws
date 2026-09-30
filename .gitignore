@@ -38,3 +38,5 @@ HealthCompanion/web-ui/.venv/
 
 # scratch outputs
 HealthCompanion/_*.txt
+HealthCompanion/_*.json
+_*.txt

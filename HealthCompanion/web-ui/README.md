@@ -1,8 +1,23 @@
 # Health Companion — Web UI
 
-A clean, bilingual (Arabic / English) chat interface for the Health Companion
-agent. Single self-contained page (`index.html`) served by a tiny stdlib-only
-Python proxy (`server.py`) that streams the agent's responses to the browser.
+Two ways to run the interface, for two different moments:
+
+| UI | File(s) | Talks to | Needs | Best for |
+| --- | --- | --- | --- | --- |
+| **Local dev UI** (this guide) | `index.html` + `server.py` | local `agentcore dev` on :8080 | nothing (stdlib only) | fast iteration, offline demo, MVP |
+| **Deployed demo UI** | `app.py` (Streamlit) | the deployed AgentCore runtime | `pip install streamlit boto3`, Cognito login | the hosted/authenticated demo |
+
+Both are bilingual (Arabic / English) and stream the same agent responses.
+This README covers the **local dev UI**; see the header of `app.py` for the
+Streamlit one.
+
+---
+
+## Local dev UI
+
+A clean, cinematic, self-contained page (`index.html`) served by a tiny
+stdlib-only Python proxy (`server.py`) that streams the agent's responses to the
+browser. No login, no build step, no dependencies.
 
 ## Run it
 
