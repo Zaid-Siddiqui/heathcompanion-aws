@@ -37,6 +37,9 @@ STRINGS = {
         "patient": "Patient",
         "emergency": "Emergency? Call 998",
         "thinking": "Checking the guidelines…",
+        "speak": "🎤 Speak",
+        "stop": "⏹ Stop",
+        "voice_hint": "Tap Speak, describe your symptoms, tap Stop — works in Chrome/Edge.",
     },
     "ar": {
         "title": "رفيق الصحة",
@@ -52,8 +55,13 @@ STRINGS = {
         "patient": "المريض",
         "emergency": "حالة طارئة؟ اتصل بالرقم 998",
         "thinking": "جارٍ مراجعة الإرشادات…",
+        "speak": "🎤 تحدّث",
+        "stop": "⏹ إيقاف",
+        "voice_hint": "اضغط تحدّث، صِف أعراضك، ثم اضغط إيقاف — يعمل في Chrome/Edge.",
     },
 }
+
+SPEECH_LANG = {"en": "en-US", "ar": "ar-AE"}
 
 PATIENTS = {
     "PAT-01": "Aisha Rahman — عائشة رحمن (hypertension, PlanA, ar)",
@@ -203,7 +211,20 @@ def main() -> None:
         with st.chat_message(role):
             st.markdown(message)
 
-    prompt = st.chat_input(text["input"])
+    # Voice: browser speech recognition (Web Speech API) → transcript used as the prompt.
+    spoken = None
+    try:
+        from streamlit_mic_recorder import speech_to_text
+
+        spoken = speech_to_text(
+            language=SPEECH_LANG[lang], start_prompt=text["speak"], stop_prompt=text["stop"],
+            just_once=True, use_container_width=False, key="voice",
+        )
+        st.caption(text["voice_hint"])
+    except ImportError:
+        pass
+
+    prompt = st.chat_input(text["input"]) or spoken
     if prompt:
         st.session_state["history"].append(("user", prompt))
         with st.chat_message("user"):
