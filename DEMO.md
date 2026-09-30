@@ -55,6 +55,15 @@ AgentCore Memory (semantic namespace `/users/<actor>/facts`; verified — 9 fact
 Show the records if asked:
 `aws bedrock-agentcore list-memory-records --memory-id HealthCompanion_HealthMemory-bMJEFtF7od --namespace /users/aisha/facts`
 
+## 8. Voice (optional, ~20 s)
+In Chrome/Edge, tap **🎤 Speak**, say the symptoms (Arabic or English, matching the language toggle), tap **⏹ Stop**.
+The transcript is sent as the message. Browser speech recognition is used because Amazon Transcribe is outside the
+workshop's participant permissions.
+
+## Observability note
+`agentcore logs` / CloudWatch log groups work. The GenAI Observability *traces* view needs CloudWatch Transaction
+Search, which participants cannot enable (`application-signals:StartDiscovery` is denied) — mention this if asked.
+
 ## Talking points
 - Strands agent on AgentCore Runtime; 7 tools as one Lambda behind AgentCore Gateway (MCP, IAM auth, SigV4);
   AgentCore Memory (user-preference + semantic); Bedrock Knowledge Base for guidelines; baseline Bedrock Guardrail.
