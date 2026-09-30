@@ -1,8 +1,0 @@
-﻿PAGE STATUS:
-200 bytes=21854
-
-HEALTH:
-{"agent": "online"}
-
-MISSING FILE (expect 404):
-404

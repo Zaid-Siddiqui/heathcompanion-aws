@@ -35,3 +35,6 @@ Thumbs.db
 
 # Web UI
 HealthCompanion/web-ui/.venv/
+
+# scratch outputs
+HealthCompanion/_*.txt
