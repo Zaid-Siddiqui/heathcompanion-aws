@@ -4,6 +4,9 @@ toolbarMode = "viewer"
 [browser]
 gatherUsageStats = false
 
+[server]
+runOnSave = true
+
 [theme]
 base = "dark"
 primaryColor = "#2dd4bf"

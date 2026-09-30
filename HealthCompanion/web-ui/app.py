@@ -87,8 +87,11 @@ def load_config() -> dict:
 
 
 def apply_direction(lang: str) -> None:
+    # Hide Streamlit's own chrome (menu, header, footer) for the demo.
+    css = "#MainMenu, header[data-testid='stHeader'], footer { visibility: hidden; height: 0; }"
     if lang == "ar":
-        st.markdown("<style>.stApp { direction: rtl; text-align: right; }</style>", unsafe_allow_html=True)
+        css += " .stApp { direction: rtl; text-align: right; }"
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
 def _finish_sign_in(resp: dict, email: str) -> None:
